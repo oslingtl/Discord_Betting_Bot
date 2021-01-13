@@ -245,11 +245,11 @@ class User():
 
     def _today(self):
         dt = datetime.now(timezone(TIMEZONE))
-        return datetime(dt.year, dt.month, dt.day)
+        return datetime(dt.year, dt.month, dt.day, tzinfo=timezone(TIMEZONE))
 
     def daily(self):
         if self._today() - self._daily < timedelta(days=1):
-            return self.name() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.today() - self._daily)) + " more to retrieve your daily reward!"
+            return self.name() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.now(timezone(TIMEZONE)) - self._daily)) + " more to retrieve your daily reward!"
         self._money += abs(DAILY)
         self._daily = self._today()
         return self.name() + " gained ${:.2f}".format(abs(DAILY))
