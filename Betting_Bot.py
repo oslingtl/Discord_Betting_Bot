@@ -28,9 +28,9 @@ class BettingSystem():
 
     def resolve_event(self, event_id, result):
         side = False
-        if any(sstring in result.lower() for sstring in self._valid_yes): # self._valid_yes in str(result).lower():
+        if any(sstring in result.lower() for sstring in self._valid_yes):
             side = True
-        elif not(any(sstring in result.lower() for sstring in self._valid_no)): # self._valid_no in str(result).lower():
+        elif not(any(sstring in result.lower() for sstring in self._valid_no)):
             return self._invalid_side_message
 
         if not (event_id in self._curr_events):
@@ -379,7 +379,7 @@ async def daily(ctx):
 # System information
 
 # list all ongoing events
-@client.command(aliases=["list"], usage="", help="Allows any user to see live events and bets.")
+@client.command(aliases=["list", "o", "live"], usage="", help="Allows any user to see live events and bets.")
 async def ongoing(ctx):
     await ctx.send(client.system.list_current_events())
 
@@ -394,12 +394,12 @@ async def history(ctx):
     await ctx.send(client.system.list_user_past_bets(ctx.author))
 
 # A user's betting history
-@client.command(aliases=["top", "leader"], usage="", help="Ranks everyone by money.")
+@client.command(aliases=["top", "leader", "l"], usage="", help="Ranks everyone by money.")
 async def leaderboard(ctx):
     await ctx.send(client.system.list_money_leaderboard())
 
 # A user's betting history
-@client.command(aliases=["allpnl", "pnl"], usage="", help="Ranks everyone by profit/loss.")
+@client.command(aliases=["allpnl", "pnl", "p"], usage="", help="Ranks everyone by profit/loss.")
 async def bestpnl(ctx):
     await ctx.send(client.system.list_best_pnl())
 
