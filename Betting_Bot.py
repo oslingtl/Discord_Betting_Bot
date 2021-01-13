@@ -20,6 +20,7 @@ class BettingSystem():
         self._valid_no = ["n", "no", "l", "loss", "lose", "f", "false"]
         self._invalid_side_message = "result must be one of " + str(self._valid_yes + self._valid_no)
         self.MAX_BET = 5000
+        self.MIN_BET = 1
 
     def add_event(self, description, odds = 2.00):
         event = BetEvent(self.next_event_id(), "\"" + description + "\"", odds)
@@ -59,13 +60,16 @@ class BettingSystem():
 
         person = self._users[user.id]
         if not person.has_money(amount):
-            return person.mention() + " does not have enough money for that bet! You have " + "$" + "{:.2f}".format(person.money()) + "."
+            return person.name() + " does not have enough money for that bet! You have " + "$" + "{:.2f}".format(person.money()) + "."
         
         if amount > self.MAX_BET:
-            return person.mention() + " that amount is above the maximum of " + "$" + "{:.2f}".format(self.MAX_BET) + "."
+            return person.name() + " that amount is above the maximum of " + "$" + "{:.2f}".format(self.MAX_BET) + "."
+
+        if amount < self.MIN_BET:
+            return person.name() + " that amount is below the minimum of " + "$" + "{:.2f}".format(self.MIN_BET) + "."
 
         if not event_id in self._curr_events:
-            return person.mention() + " that event could not be found."
+            return person.name() + " that event could not be found."
 
         side = True
         if any(sstring in result.lower() for sstring in self._valid_no): # self._valid_no in result:
@@ -73,8 +77,8 @@ class BettingSystem():
         elif not(any(sstring in result.lower() for sstring in self._valid_yes)) :
             return self._invalid_side_message
         event = self._curr_events[event_id]
-        event.add_bet(person, amount, side)
-        return person.mention() + " $" + "{:.2f}".format(amount) + " bet placed successfully."
+        
+        return event.add_bet(person, amount, side)
 
     def list_user_bets(self, user):
         if not user.id in self._users:
@@ -95,7 +99,7 @@ class BettingSystem():
         i = 1
         users_sorted_by_money = sorted(self._users.items(), key=lambda x: x[1].money(), reverse=True)
         for (_id, user) in users_sorted_by_money:
-            output +=  f"{str(i): <{2}}" + ". " + f"{user.name(): <{15}}" + " $" + f"{user.money(): <20.2f}\n"
+            output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{15}}" + " $" + f"{user.money(): <20.2f}\n"
             i += 1
         return output
 
@@ -107,7 +111,7 @@ class BettingSystem():
             neg = ""
             if user.pnl() < 0:
                 neg = "-"
-            output +=  f"{str(i): <{2}}" + ". " + f"{user.name(): <{15}} " + neg + "$" + f"{abs(user.pnl()): <20.2f}\n"
+            output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{15}} " + neg + "$" + f"{abs(user.pnl()): <20.2f}\n"
             i += 1
         return output
 
@@ -153,13 +157,17 @@ class User():
         return "<@" + str(self._id) + ">"
 
     def print_money(self):
-        return self.mention() + " has " + "$" + "{:.2f}".format(self.money()) + "."
+        return self.name() + " has " + "$" + "{:.2f}".format(self.money()) + "."
 
     def list_bets(self):
         neg = ""
         if self._total_pnl < 0:
             neg = "-"
-        output = self.mention() + " has total PnL " + neg + "${:.2f}".format(abs(self._total_pnl)) + ".\nOngoing bets:\n"
+        output = self.name() + " has total PnL " + neg + "${:.2f}".format(abs(self._total_pnl)) + ".\n"
+        if len(self._current_bets) > 0:
+            output += "Live bets:\n"
+        else:
+            output += "No current bets.\n"
         for bet in self._current_bets:
             output += "\t" + bet.description() + "\n"
         return output
@@ -168,10 +176,10 @@ class User():
         neg = ""
         if self._total_pnl < 0:
             neg = "-"
-        output = self.mention() + " has total PnL " + neg + "${:.2f}".format(abs(self._total_pnl)) + ".\nPast bets:\n"
+        output = self.mention() + " has total PnL " + neg + "${:.2f}".format(abs(self._total_pnl)) + ".\n```Past bets:\n"
         for bet in self._past_bets:
             output += "\t" + bet.description() + "\n"
-        return output
+        return output + "```"
 
     def archive_bet(self, event_id):
         i = 0
@@ -187,11 +195,11 @@ class User():
 
     def daily(self):
         if self._today() - self._daily < timedelta(days=1):
-            return self.mention() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.today() - self._daily)) + " more to retrieve your daily reward!"
+            return self.name() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.today() - self._daily)) + " more to retrieve your daily reward!"
         else:
             self._money += 100
             self._daily = self._today()
-        return self.mention() + " gained $100.00!"
+        return self.name() + " gained $100.00!"
 
     def has_money(self, amount):
         return self._money >= amount
@@ -222,9 +230,9 @@ class BetEvent():
     def add_bet(self, user, amount, side):
         if user.has_money(amount):
             self._bets.append(user.place_bet(self, amount, side))
-            return "bet placed successfully " + user.mention() + " :)"
+            return  user.name() + "'s $" + "{:.2f}".format(amount) + " bet placed successfully."
         else:
-            return "insufficient funds " + user.mention() + "!"
+            return "insufficient funds " + user.name() + "!"
 
     def payout(self, winning_side):
         self._resolved = True
@@ -242,9 +250,14 @@ class BetEvent():
         return self._odds/(self._odds-1)  # x/(x-1) is the other side
 
     def information(self, mention=False):
-        output = self._description + " @" + "{:.2f}".format(self.odds(True)) + "\n"
+        output = ""
+        if mention:
+            output = "```"
+        output += self._description + " @ $" + "{:.2f}".format(self.odds(True)) + "\n"
         if self.resolved():
             output += "RESULT: " + str(self._result).upper() + "\n"
+        if mention:
+            output += "```"
         for bet in self._bets:
             output += "\t" + bet.short_info(mention) + "\n"
         return output
@@ -259,10 +272,10 @@ class Bet():
 
     def description(self):
         join = " that "
-        if self.side():
+        if not(self.side()):
             join = " against "
         if self._resolution == "n/a":
-            return self.user().name() + " bet " + "$" + "{:.2f}".format(self.amount()) + " @" + "{:.2f}".format(self.underlying().odds(self.side())) + join + self.underlying()._description
+            return self.user().name() + " bet " + "$" + "{:.2f}".format(self.amount()) + " @ $" + "{:.2f}".format(self.underlying().odds(self.side())) + join + self.underlying()._description
         else:
             return self.user().name() + " " + self._resolution + " " + "$" + "{:.2f}".format(self.amount() * self.underlying().odds(self.side())) + " betting" + join + self.underlying()._description
 
@@ -308,6 +321,9 @@ class Bet():
     def underlying(self):
         return self._underlying
 
+# wraps the text in ```<text>``` for ascii table output
+def wrap(text):
+    return "```" + text + "```"
 
 ################################################
 # Setup
@@ -351,7 +367,7 @@ async def on_ready():
 @client.command(aliases=["e"], usage="<odds> <description>", help="Allows a BettingAdmin to create an event for users to bet on.\ne.g. event 2 Oslo gets a penta this game.")
 @commands.has_role("BettingAdmin")
 async def event(ctx, odds, *, description):
-    await ctx.send(client.system.add_event(description, float(odds)))
+    await ctx.send(wrap(client.system.add_event(description, float(odds))))
 
 # Resolve event
 @client.command(aliases=["r"], usage="<eventId> <result (yes/no)>", help="Allows a BettingAdmin to resolve an event that users have bet on.\ne.g. resolve 21 y.")
@@ -362,18 +378,18 @@ async def resolve(ctx, event_id, result):
 # Bet on an event
 @client.command(aliases=["b"], usage="<eventId> <result (yes/no)> <amount>", help="Allows any user to bet on an ongoing event.\ne.g. bet 1 y 100.")
 async def bet(ctx, event_id, result, amount):
-    await ctx.send(client.system.user_bet(int(event_id), ctx.author, result, float(amount)))
+    await ctx.send(wrap(client.system.user_bet(int(event_id), ctx.author, result, float(amount))))
 
 ################################################
 # See current money
 @client.command(aliases=["m"], usage="", help="Allows any user to see their current money supply.")
 async def money(ctx):
-    await ctx.send(client.system.print_money(ctx.author))
+    await ctx.send(wrap(client.system.print_money(ctx.author)))
 
 # Get daily money reward
 @client.command(aliases=["d"], usage="", help="Retrieve daily login reward.")
 async def daily(ctx):
-    await ctx.send(client.system.daily(ctx.author))
+    await ctx.send(wrap(client.system.daily(ctx.author)))
 
 ################################################
 # System information
@@ -381,12 +397,12 @@ async def daily(ctx):
 # list all ongoing events
 @client.command(aliases=["list", "o", "live"], usage="", help="Allows any user to see live events and bets.")
 async def ongoing(ctx):
-    await ctx.send(client.system.list_current_events())
+    await ctx.send(wrap(client.system.list_current_events()))
 
 # list a users current bets
 @client.command(aliases=["bs"], usage="", help="Allows any user to see their current bets.")
 async def bets(ctx):
-    await ctx.send(client.system.list_user_bets(ctx.author))
+    await ctx.send(wrap(client.system.list_user_bets(ctx.author)))
 
 # A user's betting history
 @client.command(aliases=["h", "hist"], usage="", help="Allows any user to see their past betting history.")
@@ -396,27 +412,27 @@ async def history(ctx):
 # A user's betting history
 @client.command(aliases=["top", "leader", "l"], usage="", help="Ranks everyone by money.")
 async def leaderboard(ctx):
-    await ctx.send(client.system.list_money_leaderboard())
+    await ctx.send(wrap(client.system.list_money_leaderboard()))
 
 # A user's betting history
 @client.command(aliases=["allpnl", "pnl", "p"], usage="", help="Ranks everyone by profit/loss.")
 async def bestpnl(ctx):
-    await ctx.send(client.system.list_best_pnl())
+    await ctx.send(wrap(client.system.list_best_pnl()))
 
 # Store all user data (serialized)
 @client.command(aliases=["s", "shutdown"], usage="", help="Save current system state to file.")
 async def save(ctx):
     with open(PICKLE_FILENAME, 'wb') as handle:
         pickle.dump(client.system, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    await ctx.send("Data saved successfully :sleeping:")
+    await ctx.send(wrap("Data saved successfully"))
 
 @client.command(aliases=["latency"], usage="", help="Show bot latency")
 async def ping(ctx):
-    await ctx.send(str(round(client.latency*1000,2)) + "ms")
+    await ctx.send(wrap(str(round(client.latency*1000,2)) + "ms"))
 
 # test
 @client.command()
 async def rage(ctx):
-    await ctx.send('Sucks to suck idiots')
+    await ctx.send(wrap('Sucks to suck idiots'))
 
 client.run(TOKEN)
