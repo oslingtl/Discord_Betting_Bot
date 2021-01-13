@@ -513,18 +513,17 @@ async def load(ctx):
             await ctx.send(wrap("file loaded successfully."))
             return      
 
-
-@client.command(aliases=["latency"], usage="", help="Show bot latency")
+@client.command(aliases=["latency"], usage="", help="Show bot latency.")
 async def ping(ctx):
     await ctx.send(wrap(str(round(client.latency*1000,2)) + "ms"))
 
 # test
-@client.command(usage="", help="When you're mad")
+@client.command(usage="", help="When you're mad.")
 async def rage(ctx):
     await ctx.send(wrap('Sucks to suck idiot'))
 
 # renaming users
-@client.command(usage="", help="Regenerate a users' name (using their current display name)")
+@client.command(usage="", help="Regenerate a users' name (using their current display name).")
 async def rename(ctx):
     await ctx.send(wrap(client.system.rename_user(ctx.author)))
 
