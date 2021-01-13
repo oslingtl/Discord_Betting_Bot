@@ -495,7 +495,24 @@ async def bestpnl(ctx):
 async def save(ctx):
     with open(PICKLE_FILENAME, 'wb') as handle:
         pickle.dump(client.system, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    await ctx.send(wrap("Data saved successfully"))
+    await ctx.send(wrap("Data saved successfully."))
+    with open(PICKLE_FILENAME, 'rb') as handle:
+        await ctx.send(file=discord.File(handle))
+
+# Load user data (serialized)
+@client.command(aliases=["reload"], usage="", help="Load current system state from file. Must be attached with the command and named " + PICKLE_FILENAME + ".")
+@commands.has_role("BettingAdmin")
+async def load(ctx):
+    if not(ctx.message.attachments):
+        await ctx.send(wrap(ctx.author.display_name + " loading requires an attachment."))
+        return
+    for attachment in ctx.message.attachments:
+        if attachment.filename == PICKLE_FILENAME:
+            file_bytes = await attachment.read()
+            client.system = pickle.loads(file_bytes)
+            await ctx.send(wrap("file loaded successfully."))
+            return      
+
 
 @client.command(aliases=["latency"], usage="", help="Show bot latency")
 async def ping(ctx):
