@@ -6,6 +6,7 @@ import configparser
 from datetime import datetime, timedelta
 
 import pickle
+import os
 
 ################################################
 # Classes
@@ -47,6 +48,13 @@ class BettingSystem():
         if self._curr_events[event_id].locked():
             return self._curr_events[event_id]._description + " is already locked."
         return self._curr_events[event_id].lock()
+    
+    def unlock_event(self, event_id):
+        if not (event_id in self._curr_events):
+            return "invalid eventId, try using <ongoing> to see current events."
+        if not(self._curr_events[event_id].locked()):
+            return self._curr_events[event_id]._description + " is not locked."
+        return self._curr_events[event_id].unlock()
 
     def next_event_id(self):
         self._eventIds += 1
@@ -298,6 +306,15 @@ class BetEvent():
         else:
             self._locked = True
             return "Event " + str(self._id) + " locked. Bets are now closed."
+    
+    def unlock(self):
+        if not(self._locked):
+            return "Already unlocked."
+        if self._resolved:
+            return "Already resolved - can't unlock."
+        else:
+            self._locked = False
+            return "Event " + str(self._id) + " unlocked. Bets are now reopened."
 
 class Bet():
     def __init__(self, event, user, amount, side):
@@ -364,11 +381,18 @@ def wrap(text):
 
 ################################################
 # Setup
+TOKEN = ""
+PREFIX = ""
+
 CONFIG = 'config.ini'
 parser = configparser.ConfigParser()
-parser.read(CONFIG)
-TOKEN = str(parser['DISCORD']['token'])
-PREFIX = str(parser['DISCORD']['prefix'])
+try:
+    parser.read(CONFIG)
+    TOKEN = str(parser['DISCORD']['token'])
+    PREFIX = str(parser['DISCORD']['prefix'])
+except:
+    TOKEN = str(os.environ['token'])
+    PREFIX = str(os.environ['prefix'])
 
 #intents - todo
 # intents = discord.Intents.none()
@@ -417,12 +441,15 @@ async def resolve(ctx, event_id, result):
 async def bet(ctx, event_id, result, amount):
     await ctx.send(wrap(client.system.user_bet(int(event_id), ctx.author, result, float(amount))))
 
-
-# Bet on an event
-@client.command(aliases=["lo"], usage="<eventId>", help="Allows a BettomgAdmin to lock a current event.\ne.g. lock 11.")
+# Lock an event
+@client.command(aliases=["lo"], usage="<eventId>", help="Allows a BettingAdmin to lock a current event.\ne.g. lock 11.")
 async def lock(ctx, event_id):
     await ctx.send(wrap(client.system.lock_event(int(event_id))))
 
+# Unlock an event
+@client.command(aliases=["unlo"], usage="<eventId>", help="Allows a BettingAdmin to unlock a current event.\ne.g. unlock 11.")
+async def unlock(ctx, event_id):
+    await ctx.send(wrap(client.system.unlock_event(int(event_id))))
 
 ################################################
 # See current money

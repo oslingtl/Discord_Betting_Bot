@@ -9,6 +9,8 @@ token = PUTYOURTOKENHERE
 prefix = ~
 ```
 
+Alternatively, create environment variables for `token` and `prefix`.
+
 ## Usage
 Use `~help` to find available commands, and `~help <command>` for detailed usage information. A user must be set up with the role `BettingAdmin` in the server to administrate the bot, such as creating and resolving events.
 
