@@ -48,6 +48,12 @@ class BettingSystem():
         self.MAX_BET = 5000
         self.MIN_BET = 1
 
+    #todo remove
+    def fix(self):
+        event = self._curr_events.pop(5)
+        self._past_events[5] = event
+        return "done"
+
     def add_event(self, description, odds = 2.00):
         event = BetEvent(self.next_event_id(), "\"" + description + "\"", odds)
         self._curr_events[event._id] = event
@@ -63,8 +69,9 @@ class BettingSystem():
         if not (event_id in self._curr_events):
             return "invalid eventId, try using <ongoing> to see current events."
 
-        event = self._curr_events[event_id]
+        event = self._curr_events.pop(event_id)
         event.payout(side)
+        self._past_events[event_id] = event
         return event.information(True)
 
     def lock_event(self, event_id):
@@ -92,6 +99,15 @@ class BettingSystem():
             output += "<" + str(event._id) + "> " + event.information() + "\n"
         if output == "":
             output = "No ongoing events."
+        return output
+
+    def list_past_events(self):
+        output = ""
+        for key in self._past_events:
+            event = self._past_events[key]
+            output += "<" + str(event._id) + "> " + event.information() + "\n"
+        if output == "":
+            output = "No past events."
         return output
 
     def user_bet(self, event_id, user, result, amount):
@@ -477,9 +493,14 @@ async def daily(ctx):
 # System information
 
 # list all ongoing events
-@client.command(aliases=["list", "o", "on", "live"], usage="", help="Allows any user to see live events and bets.")
+@client.command(aliases=["list", "o", "on", "live"], usage="", help="Allows any user to see all live events and bets.")
 async def ongoing(ctx):
     await ctx.send(wrap(client.system.list_current_events()))
+
+# list all past events
+@client.command(aliases=["pastevents", "past", "all"], usage="", help="Allows any user to see all past events and bets.")
+async def allhistory(ctx):
+    await ctx.send(wrap(client.system.list_past_events()))
 
 # list a users current bets
 @client.command(aliases=["bs"], usage="", help="Allows any user to see their current bets.")
@@ -537,5 +558,12 @@ async def rage(ctx):
 @client.command(usage="", help="Regenerate a users' name (using their current display name).")
 async def rename(ctx):
     await ctx.send(wrap(client.system.rename_user(ctx.author)))
+
+
+# todo
+@client.command(usage="", help="")
+async def fix(ctx):
+    await ctx.send(wrap(client.system.fix()))
+
 
 client.run(TOKEN)
