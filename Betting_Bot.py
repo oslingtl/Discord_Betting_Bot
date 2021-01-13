@@ -50,6 +50,9 @@ class BettingSystem():
 
     #todo remove
     # def fix(self):
+    #     for key in self._users:
+    #         user = self._users[key]
+    #         user._daily = user._today()
     #     return "done"
 
     def add_event(self, description, odds = 2.00):
@@ -258,12 +261,12 @@ class User():
         return
 
     def _today(self):
-        dt = datetime.now(timezone(TIMEZONE))
-        return datetime(dt.year, dt.month, dt.day, tzinfo=timezone(TIMEZONE))
+        dt = datetime.today()
+        return datetime(dt.year, dt.month, dt.day)
 
     def daily(self):
         if self._today() - self._daily < timedelta(days=1):
-            return self.name() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.now(timezone(TIMEZONE)) - self._daily)) + " more to retrieve your daily reward!"
+            return self.name() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.today() - self._daily)) + " more to retrieve your daily reward!"
         self._money += abs(DAILY)
         self._daily = self._today()
         return self.name() + " gained ${:.2f}".format(abs(DAILY))
@@ -560,6 +563,6 @@ async def rename(ctx):
 # todo remove
 # @client.command(usage="", help="")
 # async def fix(ctx):
-    # await ctx.send(wrap(client.system.fix()))
+#     await ctx.send(wrap(client.system.fix()))
 
 client.run(TOKEN)
