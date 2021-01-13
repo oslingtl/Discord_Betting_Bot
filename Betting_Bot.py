@@ -49,10 +49,8 @@ class BettingSystem():
         self.MIN_BET = 1
 
     #todo remove
-    def fix(self):
-        event = self._curr_events.pop(5)
-        self._past_events[5] = event
-        return "done"
+    # def fix(self):
+    #     return "done"
 
     def add_event(self, description, odds = 2.00):
         event = BetEvent(self.next_event_id(), "\"" + description + "\"", odds)
@@ -275,7 +273,7 @@ class User():
 
     def win_bet(self, amount, odds):
         self._money += amount * odds
-        self._total_pnl += amount * odds
+        self._total_pnl += amount * (odds-1)
 
     def lose_bet(self, amount):
         self._total_pnl -= amount
@@ -559,11 +557,9 @@ async def rage(ctx):
 async def rename(ctx):
     await ctx.send(wrap(client.system.rename_user(ctx.author)))
 
-
-# todo
-@client.command(usage="", help="")
-async def fix(ctx):
-    await ctx.send(wrap(client.system.fix()))
-
+# todo remove
+# @client.command(usage="", help="")
+# async def fix(ctx):
+    # await ctx.send(wrap(client.system.fix()))
 
 client.run(TOKEN)
