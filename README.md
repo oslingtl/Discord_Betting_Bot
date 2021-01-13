@@ -7,6 +7,9 @@ Create a file `config.ini` in the root folder with structure:
 [DISCORD]
 token = PUTYOURTOKENHERE 
 prefix = ~
+timezone = Australia/Sydney
+daily = 100
+starting_money = 10000
 ```
 
 Alternatively, create environment variables for `token` and `prefix`.

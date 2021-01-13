@@ -4,9 +4,34 @@ from discord.ext import commands
 
 import configparser
 from datetime import datetime, timedelta
+from pytz import timezone
 
 import pickle
 import os
+
+################################################
+# Setup
+TOKEN = ""
+PREFIX = ""
+TIMEZONE = "Australia/Sydney"
+DAILY = 100
+STARTING_MONEY = 10000
+
+CONFIG = 'config.ini'
+parser = configparser.ConfigParser()
+try:
+    parser.read(CONFIG)
+    TOKEN = str(parser['DISCORD']['token'])
+    PREFIX = str(parser['DISCORD']['prefix'])
+    TIMEZONE = str(parser['DISCORD']['timezone'])
+    DAILY = int(parser['DISCORD']['daily'])
+    STARTING_MONEY = int(parser['DISCORD']['starting_money'])
+except:
+    TOKEN = str(os.environ['token'])
+    PREFIX = str(os.environ['prefix'])
+    TIMEZONE = str(os.environ['timezone'])
+    DAILY = int(os.environ['daily'])
+    STARTING_MONEY = int(os.environ['starting_money'])
 
 ################################################
 # Classes
@@ -163,7 +188,7 @@ class User():
     def __init__(self, name, userId):
         self._id = userId
         self._name = name
-        self._money = 10000
+        self._money = STARTING_MONEY
         self._current_bets = []
         self._past_bets = []
         self._daily = self._today() - timedelta(days=1)
@@ -219,16 +244,15 @@ class User():
         return
 
     def _today(self):
-        dt = datetime.today()
+        dt = datetime.now(timezone(TIMEZONE))
         return datetime(dt.year, dt.month, dt.day)
 
     def daily(self):
         if self._today() - self._daily < timedelta(days=1):
             return self.name() + " you need to wait " + custom_format(timedelta(days=1) - (datetime.today() - self._daily)) + " more to retrieve your daily reward!"
-        else:
-            self._money += 100
-            self._daily = self._today()
-        return self.name() + " gained $100.00!"
+        self._money += abs(DAILY)
+        self._daily = self._today()
+        return self.name() + " gained ${:.2f}".format(abs(DAILY))
 
     def has_money(self, amount):
         return self._money >= amount
@@ -380,19 +404,6 @@ def wrap(text):
     return "```" + text + "```"
 
 ################################################
-# Setup
-TOKEN = ""
-PREFIX = ""
-
-CONFIG = 'config.ini'
-parser = configparser.ConfigParser()
-try:
-    parser.read(CONFIG)
-    TOKEN = str(parser['DISCORD']['token'])
-    PREFIX = str(parser['DISCORD']['prefix'])
-except:
-    TOKEN = str(os.environ['token'])
-    PREFIX = str(os.environ['prefix'])
 
 #intents - todo
 # intents = discord.Intents.none()
@@ -480,12 +491,12 @@ async def bets(ctx):
 async def history(ctx):
     await ctx.send(client.system.list_user_past_bets(ctx.author))
 
-# A user's betting history
+# Leaderboard ranked by money
 @client.command(aliases=["top", "leader", "l"], usage="", help="Ranks everyone by money.")
 async def leaderboard(ctx):
     await ctx.send(wrap(client.system.list_money_leaderboard()))
 
-# A user's betting history
+# Leaderboard ranked by PnL
 @client.command(aliases=["allpnl", "pnl", "p"], usage="", help="Ranks everyone by profit/loss.")
 async def bestpnl(ctx):
     await ctx.send(wrap(client.system.list_best_pnl()))
