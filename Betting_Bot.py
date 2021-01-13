@@ -41,6 +41,13 @@ class BettingSystem():
         event.payout(side)
         return event.information(True)
 
+    def lock_event(self, event_id):
+        if not (event_id in self._curr_events):
+            return "invalid eventId, try using <ongoing> to see current events."
+        if self._curr_events[event_id].locked():
+            return self._curr_events[event_id]._description + " is already locked."
+        return self._curr_events[event_id].lock()
+
     def next_event_id(self):
         self._eventIds += 1
         return self._eventIds
@@ -70,6 +77,9 @@ class BettingSystem():
 
         if not event_id in self._curr_events:
             return person.name() + " that event could not be found."
+
+        if self._curr_events[event_id].locked():
+            return person.name() + " that event is closed for betting."
 
         side = True
         if any(sstring in result.lower() for sstring in self._valid_no): # self._valid_no in result:
@@ -108,7 +118,7 @@ class BettingSystem():
         i = 1
         users_sorted_by_money = sorted(self._users.items(), key=lambda x: x[1].pnl(), reverse=True)
         for (_id, user) in users_sorted_by_money:
-            neg = ""
+            neg = " "
             if user.pnl() < 0:
                 neg = "-"
             output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{15}} " + neg + "$" + f"{abs(user.pnl()): <20.2f}\n"
@@ -129,6 +139,13 @@ class BettingSystem():
         person = self._users[user.id]
         return person.daily()
 
+    def rename_user(self, user):
+        if not user.id in self._users:
+            self._users[user.id] = User(user.display_name, user.id)
+
+        person = self._users[user.id]
+        return person.rename(user.display_name)
+
 def custom_format(td):
     minutes, _seconds = divmod(td.seconds, 60)
     hours, minutes = divmod(minutes, 60)
@@ -146,6 +163,10 @@ class User():
 
     def name(self):
         return self._name
+
+    def rename(self, name):
+        self._name = name
+        return name + " was renamed successfully."
 
     def pnl(self):
         return self._total_pnl
@@ -226,7 +247,8 @@ class BetEvent():
         self._odds = odds #odds for "yes"
         self._resolved = False
         self._result = "n/a"
-    
+        self._locked = False
+
     def add_bet(self, user, amount, side):
         if user.has_money(amount):
             self._bets.append(user.place_bet(self, amount, side))
@@ -236,6 +258,7 @@ class BetEvent():
 
     def payout(self, winning_side):
         self._resolved = True
+        self._locked = True
         self._result = winning_side
         for bet in self._bets:
             bet.resolve(winning_side, self.odds(bet.side()))
@@ -253,7 +276,11 @@ class BetEvent():
         output = ""
         if mention:
             output = "```"
-        output += self._description + " @ $" + "{:.2f}".format(self.odds(True)) + "\n"
+
+        locked = ""
+        if self.locked() and not(self.resolved()):
+            locked = " (locked)"
+        output += self._description + " @ $" + "{:.2f}".format(self.odds(True)) + locked + "\n"
         if self.resolved():
             output += "RESULT: " + str(self._result).upper() + "\n"
         if mention:
@@ -261,6 +288,16 @@ class BetEvent():
         for bet in self._bets:
             output += "\t" + bet.short_info(mention) + "\n"
         return output
+
+    def locked(self):
+        return self._locked
+
+    def lock(self):
+        if self._locked:
+            return "Already locked."
+        else:
+            self._locked = True
+            return "Event " + str(self._id) + " locked. Bets are now closed."
 
 class Bet():
     def __init__(self, event, user, amount, side):
@@ -380,6 +417,13 @@ async def resolve(ctx, event_id, result):
 async def bet(ctx, event_id, result, amount):
     await ctx.send(wrap(client.system.user_bet(int(event_id), ctx.author, result, float(amount))))
 
+
+# Bet on an event
+@client.command(aliases=["lo"], usage="<eventId>", help="Allows a BettomgAdmin to lock a current event.\ne.g. lock 11.")
+async def lock(ctx, event_id):
+    await ctx.send(wrap(client.system.lock_event(int(event_id))))
+
+
 ################################################
 # See current money
 @client.command(aliases=["m"], usage="", help="Allows any user to see their current money supply.")
@@ -395,7 +439,7 @@ async def daily(ctx):
 # System information
 
 # list all ongoing events
-@client.command(aliases=["list", "o", "live"], usage="", help="Allows any user to see live events and bets.")
+@client.command(aliases=["list", "o", "on", "live"], usage="", help="Allows any user to see live events and bets.")
 async def ongoing(ctx):
     await ctx.send(wrap(client.system.list_current_events()))
 
@@ -431,8 +475,13 @@ async def ping(ctx):
     await ctx.send(wrap(str(round(client.latency*1000,2)) + "ms"))
 
 # test
-@client.command()
+@client.command(usage="", help="When you're mad")
 async def rage(ctx):
-    await ctx.send(wrap('Sucks to suck idiots'))
+    await ctx.send(wrap('Sucks to suck idiot'))
+
+# renaming users
+@client.command(usage="", help="Regenerate a users' name (using their current display name)")
+async def rename(ctx):
+    await ctx.send(wrap(client.system.rename_user(ctx.author)))
 
 client.run(TOKEN)
