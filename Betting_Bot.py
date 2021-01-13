@@ -30,7 +30,7 @@ class BettingSystem():
         side = False
         if any(sstring in result.lower() for sstring in self._valid_yes): # self._valid_yes in str(result).lower():
             side = True
-        elif any(sstring in result.lower() for sstring in self._valid_no): # self._valid_no in str(result).lower():
+        elif not(any(sstring in result.lower() for sstring in self._valid_no)): # self._valid_no in str(result).lower():
             return self._invalid_side_message
 
         if not (event_id in self._curr_events):
@@ -62,7 +62,7 @@ class BettingSystem():
             return person.mention() + " does not have enough money for that bet! You have " + "$" + "{:.2f}".format(person.money()) + "."
         
         if amount > self.MAX_BET:
-            return person.mention() + " that amount is about the maximum of " + "$" + "{:.2f}".format(self.MAX_BET) + "."
+            return person.mention() + " that amount is above the maximum of " + "$" + "{:.2f}".format(self.MAX_BET) + "."
 
         if not event_id in self._curr_events:
             return person.mention() + " that event could not be found."
@@ -89,6 +89,27 @@ class BettingSystem():
 
         person = self._users[user.id]
         return person.list_past_bets()
+    
+    def list_money_leaderboard(self):
+        output = "LEADERBOARD ($):\n"
+        i = 1
+        users_sorted_by_money = sorted(self._users.items(), key=lambda x: x[1].money(), reverse=True)
+        for (_id, user) in users_sorted_by_money:
+            output +=  f"{str(i): <{2}}" + ". " + f"{user.name(): <{15}}" + " $" + f"{user.money(): <20.2f}\n"
+            i += 1
+        return output
+
+    def list_best_pnl(self):
+        output = "LEADERBOARD (PnL):\n"
+        i = 1
+        users_sorted_by_money = sorted(self._users.items(), key=lambda x: x[1].pnl(), reverse=True)
+        for (_id, user) in users_sorted_by_money:
+            neg = ""
+            if user.pnl() < 0:
+                neg = "-"
+            output +=  f"{str(i): <{2}}" + ". " + f"{user.name(): <{15}} " + neg + "$" + f"{abs(user.pnl()): <20.2f}\n"
+            i += 1
+        return output
 
     def print_money(self, user):
         if not user.id in self._users:
@@ -121,6 +142,9 @@ class User():
 
     def name(self):
         return self._name
+
+    def pnl(self):
+        return self._total_pnl
 
     def money(self):
         return self._money
@@ -176,12 +200,14 @@ class User():
         self._money += amount * odds
         self._total_pnl += amount * odds
 
+    def lose_bet(self, amount):
+        self._total_pnl -= amount
+
     def place_bet(self, betEvent, amount, side):
         assert(self.has_money(amount))
         bet = Bet(betEvent, self, amount, side)
         self._money -= amount
         self._current_bets.append(bet)
-        self._total_pnl -= amount
         return bet
 
 class BetEvent():
@@ -268,6 +294,7 @@ class Bet():
             self._user.win_bet(self.amount(), odds)
         else:
             self._resolution = "lost"
+            self._user.lose_bet(self.amount())
 
     def side(self):
         return self._side
@@ -287,7 +314,8 @@ class Bet():
 CONFIG = 'config.ini'
 parser = configparser.ConfigParser()
 parser.read(CONFIG)
-TOKEN = parser['DISCORD']['token']
+TOKEN = str(parser['DISCORD']['token'])
+PREFIX = str(parser['DISCORD']['prefix'])
 
 #intents - todo
 # intents = discord.Intents.none()
@@ -298,7 +326,7 @@ TOKEN = parser['DISCORD']['token']
 help_command = commands.DefaultHelpCommand(
     no_category = 'Commands'
 )
-client = commands.Bot(case_insensitive=True, command_prefix=commands.when_mentioned_or('~'), description="Simple betting bot to gamble on the outcome of admin created events.", help_command = help_command)#, intents=intents)
+client = commands.Bot(case_insensitive=True, command_prefix=commands.when_mentioned_or(PREFIX), description="Simple betting bot to gamble on the outcome of admin created events.", help_command = help_command)#, intents=intents)
 
 #### PICKLE (object persistence)
 PICKLE_FILENAME = 'betting_system.pickle'
@@ -365,12 +393,26 @@ async def bets(ctx):
 async def history(ctx):
     await ctx.send(client.system.list_user_past_bets(ctx.author))
 
+# A user's betting history
+@client.command(aliases=["top", "leader"], usage="", help="Ranks everyone by money.")
+async def leaderboard(ctx):
+    await ctx.send(client.system.list_money_leaderboard())
+
+# A user's betting history
+@client.command(aliases=["allpnl", "pnl"], usage="", help="Ranks everyone by profit/loss.")
+async def bestpnl(ctx):
+    await ctx.send(client.system.list_best_pnl())
+
 # Store all user data (serialized)
 @client.command(aliases=["s", "shutdown"], usage="", help="Save current system state to file.")
 async def save(ctx):
     with open(PICKLE_FILENAME, 'wb') as handle:
         pickle.dump(client.system, handle, protocol=pickle.HIGHEST_PROTOCOL)
     await ctx.send("Data saved successfully :sleeping:")
+
+@client.command(aliases=["latency"], usage="", help="Show bot latency")
+async def ping(ctx):
+    await ctx.send(str(round(client.latency*1000,2)) + "ms")
 
 # test
 @client.command()
