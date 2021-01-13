@@ -68,7 +68,7 @@ class BettingSystem():
             return self._invalid_side_message
 
         if not (event_id in self._curr_events):
-            return "invalid eventId, try using <ongoing> to see current events."
+            return "Invalid eventId, try using <ongoing> to see current events."
 
         event = self._curr_events.pop(event_id)
         event.payout(side)
@@ -77,14 +77,14 @@ class BettingSystem():
 
     def lock_event(self, event_id):
         if not (event_id in self._curr_events):
-            return "invalid eventId, try using <ongoing> to see current events."
+            return "Invalid eventId, try using <ongoing> to see current events."
         if self._curr_events[event_id].locked():
             return self._curr_events[event_id]._description + " is already locked."
         return self._curr_events[event_id].lock()
     
     def unlock_event(self, event_id):
         if not (event_id in self._curr_events):
-            return "invalid eventId, try using <ongoing> to see current events."
+            return "Invalid eventId, try using <ongoing> to see current events."
         if not(self._curr_events[event_id].locked()):
             return self._curr_events[event_id]._description + " is not locked."
         return self._curr_events[event_id].unlock()
@@ -92,6 +92,22 @@ class BettingSystem():
     def next_event_id(self):
         self._eventIds += 1
         return self._eventIds
+
+    def cancel_bet(self, user_id, event_id):
+        if not (event_id in self._curr_events):
+            return "Invalid eventId, try using <ongoing> to see current events."
+        if not user_id in self._users:
+            return "That user does not have any current bets."
+        user = self._users[user_id]
+        event = self._curr_events[event_id]
+        #remove from event bets list
+        for bet in event._bets:
+            if bet.user()._id == user._id:
+                event._bets.remove(bet)
+        # for bet in user._current_bets:
+        #     if bet._underlying._id == event_id:
+                user._current_bets.remove(bet)
+        return user.name() + "'s bets on " + str(event_id) + " have been deleted."
     
     def list_current_events(self):
         output = ""
@@ -157,9 +173,9 @@ class BettingSystem():
     def list_money_leaderboard(self):
         output = "LEADERBOARD ($):\n"
         i = 1
-        users_sorted_by_money = sorted(self._users.items(), key=lambda x: x[1].money(), reverse=True)
+        users_sorted_by_money = sorted(self._users.items(), key=lambda x: x[1].money_including_ongoing(), reverse=True)
         for (_id, user) in users_sorted_by_money:
-            output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{15}}" + " $" + f"{user.money(): <20.2f}\n"
+            output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{20}}" + " $" + f"{user.money_including_ongoing(): <20.2f}\n"
             i += 1
         return output
 
@@ -171,7 +187,7 @@ class BettingSystem():
             neg = " "
             if user.pnl() < 0:
                 neg = "-"
-            output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{15}} " + neg + "$" + f"{abs(user.pnl()): <20.2f}\n"
+            output +=  f"{str(i): >{2}}" + ". " + f"{user.name(): <{20}} " + neg + "$" + f"{abs(user.pnl()): <20.2f}\n"
             i += 1
         return output
 
@@ -223,6 +239,9 @@ class User():
 
     def money(self):
         return self._money
+
+    def money_including_ongoing(self):
+        return sum([bet._amount for bet in self._current_bets]) + self.money()
 
     def mention(self):
         return "<@" + str(self._id) + ">"
@@ -372,7 +391,7 @@ class Bet():
         if self._resolution == "n/a":
             return self.user().name() + " bet " + "$" + "{:.2f}".format(self.amount()) + " @ $" + "{:.2f}".format(self.underlying().odds(self.side())) + join + self.underlying()._description
         else:
-            return self.user().name() + " " + self._resolution + " " + "$" + "{:.2f}".format(self.amount() * self.underlying().odds(self.side())) + " betting" + join + self.underlying()._description
+            return self.user().name() + " " + self._resolution + " " + "$" + "{:.2f}".format(self.winnings()) + " betting" + join + self.underlying()._description
 
     def short_info(self, mention=False):
         join = "DOUBTER:  "
@@ -391,7 +410,7 @@ class Bet():
     def winnings(self):
         if self._resolution != "won":
             return self._amount
-        return self.amount()*self._underlying.odds(self.side())
+        return self.amount()*(self._underlying.odds(self.side())-1)
 
     def resolve(self, outcome, odds):
         if self._resolution != "n/a":
@@ -508,6 +527,12 @@ async def allhistory(ctx):
 async def bets(ctx):
     await ctx.send(wrap(client.system.list_user_bets(ctx.author)))
 
+# cancel a user's current bets for a particular event
+@client.command(aliases=["can"], usage="<@user> <event_id>", help="Allows a BettingAdmin to cancel someone's bets.")
+@commands.has_role("BettingAdmin")
+async def cancel(ctx, user, event_id):
+    await ctx.send(wrap(client.system.cancel_bet(int(ctx.message.mentions[0].id), int(event_id))))
+
 # A user's betting history
 @client.command(aliases=["h", "hist"], usage="", help="Allows any user to see their past betting history.")
 async def history(ctx):
@@ -559,6 +584,11 @@ async def rage(ctx):
 @client.command(usage="", help="Regenerate a users' name (using their current display name).")
 async def rename(ctx):
     await ctx.send(wrap(client.system.rename_user(ctx.author)))
+
+# Features
+@client.command(usage="", help="Upcoming features.")
+async def features(ctx):
+    await ctx.send(wrap("Integrate with lolesports and sportsbet apis to automatically generate and resolve events.\nAdd ~locktime command to lock an event after x hours."))
 
 # todo remove
 # @client.command(usage="", help="")
