@@ -490,11 +490,13 @@ async def bet(ctx, event_id, result, amount):
 
 # Lock an event
 @client.command(aliases=["lo"], usage="<eventId>", help="Allows a BettingAdmin to lock a current event.\ne.g. lock 11.")
+@commands.has_role("BettingAdmin")
 async def lock(ctx, event_id):
     await ctx.send(wrap(client.system.lock_event(int(event_id))))
 
 # Unlock an event
 @client.command(aliases=["unlo"], usage="<eventId>", help="Allows a BettingAdmin to unlock a current event.\ne.g. unlock 11.")
+@commands.has_role("BettingAdmin")
 async def unlock(ctx, event_id):
     await ctx.send(wrap(client.system.unlock_event(int(event_id))))
 
