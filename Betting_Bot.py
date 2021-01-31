@@ -45,7 +45,7 @@ class BettingSystem():
         self._valid_yes = ["y", "yes", "w", "win", "t", "true"]
         self._valid_no = ["n", "no", "l", "loss", "lose", "f", "false"]
         self._invalid_side_message = "result must be one of " + str(self._valid_yes + self._valid_no)
-        self.MAX_BET = 5000
+        self.MAX_BET = 100000
         self.MIN_BET = 1
 
     #todo remove
@@ -107,6 +107,7 @@ class BettingSystem():
         # for bet in user._current_bets:
         #     if bet._underlying._id == event_id:
                 user._current_bets.remove(bet)
+                user._money += bet.amount()
         return user.name() + "'s bets on " + str(event_id) + " have been deleted."
     
     def list_current_events(self):
