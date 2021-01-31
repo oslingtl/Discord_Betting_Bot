@@ -48,12 +48,13 @@ class BettingSystem():
         self.MAX_BET = 100000
         self.MIN_BET = 1
 
-    #todo remove
-    # def fix(self):
-    #     for key in self._users:
-    #         user = self._users[key]
-    #         user._daily = user._today()
-    #     return "done"
+    # todo remove
+    def clear(self):
+        self._past_events = {}
+        for key in self._users:
+            user = self._users[key]
+            user._past_bets = []
+        return "Cleared all historical data. PnL and money remains."
 
     def add_event(self, description, odds = 2.00):
         event = BetEvent(self.next_event_id(), "\"" + description + "\"", odds)
@@ -93,6 +94,12 @@ class BettingSystem():
         self._eventIds += 1
         return self._eventIds
 
+    def update_max_bet(self, max_bet):
+        if max_bet < self.MIN_BET:
+            return "The maximum bet must be greater than the minimum bet."
+        self.MAX_BET = max_bet
+        return "Maximum bet updated to " + str(max_bet) + "."
+
     def cancel_bet(self, user_id, event_id):
         if not (event_id in self._curr_events):
             return "Invalid eventId, try using <ongoing> to see current events."
@@ -101,7 +108,7 @@ class BettingSystem():
         user = self._users[user_id]
         event = self._curr_events[event_id]
         #remove from event bets list
-        for bet in event._bets:
+        for bet in list(event._bets):
             if bet.user()._id == user._id:
                 event._bets.remove(bet)
         # for bet in user._current_bets:
@@ -593,9 +600,17 @@ async def rename(ctx):
 async def features(ctx):
     await ctx.send(wrap("Integrate with lolesports and sportsbet apis to automatically generate and resolve events.\nAdd ~locktime command to lock an event after x hours."))
 
-# todo remove
-# @client.command(usage="", help="")
-# async def fix(ctx):
-#     await ctx.send(wrap(client.system.fix()))
+
+# Update max bet
+@client.command(aliases=["max"], usage="<eventId>", help="Allows a BettingAdmin to update the maximum betting amount.")
+@commands.has_role("BettingAdmin")
+async def max_bet(ctx, maxbet):
+    await ctx.send(wrap(client.system.update_max_bet(int(maxbet))))
+
+# Clear history
+@client.command(aliases=["clear_past"], usage="", help="Allows a BettingAdmin to clear past events (lowers save space).")
+@commands.has_role("BettingAdmin")
+async def clear(ctx):
+    await ctx.send(wrap(client.system.clear()))
 
 client.run(TOKEN)
